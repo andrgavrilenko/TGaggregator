@@ -1,4 +1,4 @@
-﻿# Byte-compiled / cache
+# Byte-compiled / cache
 __pycache__/
 *.py[cod]
 .pytest_cache/
@@ -16,6 +16,7 @@ __pycache__/
 *.db
 *.sqlite
 data/
+logs/
 
 # IDE
 .vscode/

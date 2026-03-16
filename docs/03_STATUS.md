@@ -21,6 +21,7 @@
 - [x] Включена устойчивость ingestion (retry/backoff + FloodWait handling).
 - [x] Переключен init flow на Alembic migrations.
 - [x] Добавлены и пройдены тесты (4 passed).
+- [x] Подготовлен профессиональный docs-pack для GitHub (`README`, `CONTRIBUTING`, `SECURITY`, `CHANGELOG`, API reference, runbook, issue/PR templates).
 
 ## В работе
 
@@ -30,11 +31,10 @@
 ## Не начато
 
 - [ ] Structured logging + метрики.
-- [ ] systemd/deploy runbook.
 - [ ] E2E smoke сценарии с реальным Telegram sandbox аккаунтом.
 
 ## Прогресс
 
 - Project management/docs: 100%
 - Core implementation: 65%
-- Общий прогресс MVP: 70%
+- Общий прогресс MVP: 74%

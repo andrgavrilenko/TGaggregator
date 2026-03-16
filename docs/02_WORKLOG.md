@@ -81,3 +81,16 @@
 - Верификация:
   - `uv run pytest -q` -> `4 passed`
   - `uv run python -m tgaggerator.cli init-db` -> успешно.
+
+## 2026-03-16 (update 6)
+
+- Выполнен профессиональный docs-pack для GitHub:
+  - Полностью переработан `README.md` (позиционирование, архитектура, quick start, env, API).
+  - Добавлены `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md`.
+  - Добавлены `docs/07_DEPLOY_RUNBOOK.md` и `docs/08_API_REFERENCE.md`.
+  - Добавлены шаблоны `.github`:
+    - `ISSUE_TEMPLATE/bug_report.md`
+    - `ISSUE_TEMPLATE/feature_request.md`
+    - `PULL_REQUEST_TEMPLATE.md`
+- Обновлен `.gitignore`: исключены runtime-логи (`logs/`).
+- Верификация после изменений: `uv run pytest -q` -> `4 passed`.
