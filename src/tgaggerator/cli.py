@@ -1,4 +1,6 @@
 ﻿import asyncio
+import json
+import logging
 import time
 from datetime import UTC, datetime
 
@@ -20,6 +22,19 @@ from tgaggerator.repository import (
 )
 
 app = typer.Typer(help="tgaggerator CLI")
+
+LOG_LEVEL = getattr(logging, settings.log_level.upper(), logging.INFO)
+logging.basicConfig(level=LOG_LEVEL, format="%(message)s")
+LOGGER = logging.getLogger("tgaggerator.collector")
+
+
+def log_event(event: str, **payload) -> None:
+    message = {
+        "ts": datetime.now(UTC).isoformat(),
+        "event": event,
+        **payload,
+    }
+    LOGGER.info(json.dumps(message, ensure_ascii=False, default=str))
 
 
 def _bounded_backoff(attempt: int) -> int:
@@ -69,7 +84,7 @@ async def _ingest_channel_with_retry(
     limit_per_channel: int | None,
 ) -> int:
     with SessionLocal() as db:
-        state = get_or_create_state(db, channel.id)
+        get_or_create_state(db, channel.id)
 
     for attempt in range(1, settings.ingest_max_retries + 1):
         with SessionLocal() as db:
@@ -84,7 +99,7 @@ async def _ingest_channel_with_retry(
                     min_id=state.last_msg_id or 0,
                     limit=limit_per_channel,
                 ):
-                    dto = MessageDTO.from_telethon(channel.tg_id, msg)
+                    dto = MessageDTO.from_telethon(channel.tg_id, channel.username, msg)
                     is_new = insert_message_if_new(
                         db,
                         channel_id=channel.id,
@@ -107,6 +122,14 @@ async def _ingest_channel_with_retry(
                     lag_sec = int((datetime.now(UTC) - last_seen_date).total_seconds())
                 mark_success(db, channel_id=channel.id, last_msg_id=max_msg_id, lag_sec=lag_sec)
                 db.commit()
+                log_event(
+                    "channel_ingest_ok",
+                    channel_id=channel.id,
+                    channel_title=channel.title,
+                    inserted=local_inserted,
+                    last_msg_id=max_msg_id,
+                    lag_sec=lag_sec,
+                )
                 return local_inserted
 
             except FloodWaitError as exc:
@@ -118,6 +141,13 @@ async def _ingest_channel_with_retry(
                     message=f"FloodWait attempt={attempt}: wait={wait_sec}s",
                 )
                 db.commit()
+                log_event(
+                    "channel_ingest_floodwait",
+                    channel_id=channel.id,
+                    channel_title=channel.title,
+                    attempt=attempt,
+                    wait_sec=wait_sec,
+                )
 
                 if attempt >= settings.ingest_max_retries:
                     raise
@@ -131,10 +161,19 @@ async def _ingest_channel_with_retry(
                     message=f"Attempt={attempt}: {exc}",
                 )
                 db.commit()
+                backoff = _bounded_backoff(attempt)
+                log_event(
+                    "channel_ingest_retry",
+                    channel_id=channel.id,
+                    channel_title=channel.title,
+                    attempt=attempt,
+                    backoff_sec=backoff,
+                    error=str(exc),
+                )
 
                 if attempt >= settings.ingest_max_retries:
                     raise
-                await asyncio.sleep(_bounded_backoff(attempt))
+                await asyncio.sleep(backoff)
 
     return 0
 
@@ -157,6 +196,7 @@ async def _ingest_once(limit_per_channel: int | None) -> tuple[int, int]:
                 with SessionLocal() as db:
                     mark_error(db, channel_id=channel.id, message="Entity not found in dialogs")
                     db.commit()
+                log_event("channel_entity_missing", channel_id=channel.id, channel_title=channel.title)
                 continue
 
             try:
@@ -172,6 +212,12 @@ async def _ingest_once(limit_per_channel: int | None) -> tuple[int, int]:
                 with SessionLocal() as db:
                     mark_error(db, channel_id=channel.id, message=f"Final failure: {exc}")
                     db.commit()
+                log_event(
+                    "channel_ingest_failed",
+                    channel_id=channel.id,
+                    channel_title=channel.title,
+                    error=str(exc),
+                )
 
         return inserted, processed_channels
     finally:
@@ -196,10 +242,24 @@ def ingest_once_cmd(limit: int = typer.Option(None, help="Messages per channel, 
 def ingest_loop_cmd(interval: int = typer.Option(None, help="Loop interval seconds")) -> None:
     every = interval or settings.ingest_interval_sec
     while True:
+        tick_started = datetime.now(UTC)
         try:
             inserted, channels = run(_ingest_once(None))
+            duration_ms = int((datetime.now(UTC) - tick_started).total_seconds() * 1000)
+            log_event(
+                "ingest_tick_ok",
+                channels=channels,
+                inserted=inserted,
+                duration_ms=duration_ms,
+            )
             typer.echo(f"Ingest tick: channels={channels}, inserted={inserted}")
         except Exception as exc:
+            duration_ms = int((datetime.now(UTC) - tick_started).total_seconds() * 1000)
+            log_event(
+                "ingest_tick_failed",
+                duration_ms=duration_ms,
+                error=str(exc),
+            )
             typer.echo(f"Ingest tick failed: {exc}")
         time.sleep(every)
 

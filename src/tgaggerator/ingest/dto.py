@@ -22,17 +22,31 @@ class MessageDTO:
     link: str | None
     raw_json: dict | None
 
+    @staticmethod
+    def _build_link(channel_tg_id: int, channel_username: str | None, message_id: int | None) -> str | None:
+        if message_id is None:
+            return None
+        if channel_username:
+            return f"https://t.me/{channel_username}/{message_id}"
+
+        normalized = str(abs(channel_tg_id))
+        if normalized.startswith("100"):
+            normalized = normalized[3:]
+        if not normalized:
+            return None
+        return f"https://t.me/c/{normalized}/{message_id}"
+
     @classmethod
-    def from_telethon(cls, channel_tg_id: int, msg) -> "MessageDTO":
+    def from_telethon(
+        cls,
+        channel_tg_id: int,
+        channel_username: str | None,
+        msg,
+    ) -> "MessageDTO":
         date_utc = msg.date.astimezone(UTC) if msg.date else datetime.now(UTC)
         media_type = type(msg.media).__name__ if msg.media is not None else None
         text = (msg.message or msg.text or None)
-
-        link = None
-        try:
-            link = msg.to_id and msg.id and f"https://t.me/c/{str(channel_tg_id).replace('-100', '')}/{msg.id}"
-        except Exception:
-            link = None
+        link = cls._build_link(channel_tg_id, channel_username, getattr(msg, "id", None))
 
         raw_json = None
         try:

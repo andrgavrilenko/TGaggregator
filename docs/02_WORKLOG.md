@@ -94,3 +94,21 @@
     - `PULL_REQUEST_TEMPLATE.md`
 - Обновлен `.gitignore`: исключены runtime-логи (`logs/`).
 - Верификация после изменений: `uv run pytest -q` -> `4 passed`.
+
+## 2026-03-16 (update 7)
+
+- Добавлен batch-эндпоинт управления каналами:
+  - `PATCH /channels` с телом `{ channel_ids, enabled?, muted? }`.
+- Расширен repository слой:
+  - `set_channels_flags`.
+- Улучшена генерация ссылок сообщений:
+  - публичные каналы: `https://t.me/{username}/{id}`
+  - private fallback: `https://t.me/c/{internal_id}/{id}`.
+- Добавлено структурированное логирование collector-а:
+  - события `ingest_tick_ok/failed`, `channel_ingest_ok/retry/floodwait/failed`, `channel_entity_missing`.
+- Добавлена настройка `LOG_LEVEL` в конфиг и `.env.example`.
+- Тесты расширены:
+  - batch update repository/api
+  - проверка link builder.
+- Обновлены `README.md` и `docs/08_API_REFERENCE.md`.
+- Верификация: `uv run pytest -q` -> `7 passed`.

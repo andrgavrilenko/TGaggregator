@@ -82,6 +82,30 @@ def set_channel_flags(
     return channel
 
 
+def set_channels_flags(
+    db: Session,
+    *,
+    channel_ids: list[int],
+    enabled: bool | None = None,
+    muted: bool | None = None,
+) -> list[int]:
+    if not channel_ids:
+        return []
+
+    rows = db.scalars(select(Channel).where(Channel.id.in_(channel_ids))).all()
+    updated_ids: list[int] = []
+
+    for channel in rows:
+        if enabled is not None:
+            channel.enabled = enabled
+        if muted is not None:
+            channel.muted = muted
+        updated_ids.append(channel.id)
+
+    db.flush()
+    return updated_ids
+
+
 def get_enabled_channels(db: Session) -> list[Channel]:
     rows = db.scalars(select(Channel).where(and_(Channel.enabled.is_(True), Channel.muted.is_(False))))
     return list(rows)

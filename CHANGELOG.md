@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- Batch channel flags update endpoint: `PATCH /channels`.
+- Structured collector event logs with `LOG_LEVEL` setting.
+- Safer message permalink builder for public and private channels.
+- Additional tests for batch API/repository and permalink builder.
+
 ## [0.1.0] - 2026-03-16
 
 ### Added

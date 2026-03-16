@@ -1,4 +1,4 @@
-# 08 API Reference
+﻿# 08 API Reference
 
 Base URL: `http://127.0.0.1:8000`
 
@@ -33,7 +33,7 @@ Fields:
 
 ## PATCH /channels/{channel_id}
 
-Updates channel flags.
+Updates one channel flags.
 
 Request body:
 
@@ -45,6 +45,24 @@ Request body:
 ```
 
 Rules:
+- At least one of `enabled` or `muted` must be provided.
+
+## PATCH /channels
+
+Batch updates multiple channels.
+
+Request body:
+
+```json
+{
+  "channel_ids": [1, 2, 3],
+  "enabled": true,
+  "muted": false
+}
+```
+
+Rules:
+- `channel_ids` must not be empty.
 - At least one of `enabled` or `muted` must be provided.
 
 ## GET /feed

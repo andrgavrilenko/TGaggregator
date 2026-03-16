@@ -23,5 +23,7 @@ class Settings(BaseSettings):
     ingest_retry_base_sec: int = 2
     ingest_retry_max_sec: int = 30
 
+    log_level: str = "INFO"
+
 
 settings = Settings()

@@ -14,6 +14,7 @@ Telegram content is fragmented across many channels. This project solves the wor
 - Single-writer collector model (stable writes, predictable state).
 - Incremental sync with state tracking (`last_msg_id`, lag, errors).
 - Retry/backoff and FloodWait handling.
+- Structured collector logs for operations and incident triage.
 - FastAPI backend with feed/status/channels endpoints.
 - Streamlit UI for feed browsing and filtering.
 - Alembic migrations for schema lifecycle.
@@ -116,6 +117,7 @@ Open:
 | `INGEST_MAX_RETRIES` | No | `3` | Retry attempts |
 | `INGEST_RETRY_BASE_SEC` | No | `2` | Exponential backoff base |
 | `INGEST_RETRY_MAX_SEC` | No | `30` | Backoff cap |
+| `LOG_LEVEL` | No | `INFO` | Collector/API log verbosity |
 
 ## API Overview
 
@@ -123,6 +125,7 @@ Open:
 - `GET /status`
 - `GET /channels`
 - `PATCH /channels/{channel_id}`
+- `PATCH /channels` (batch update)
 - `GET /feed`
 
 Detailed reference: [docs/08_API_REFERENCE.md](docs/08_API_REFERENCE.md)

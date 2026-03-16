@@ -17,24 +17,27 @@
 - [x] Реализован CLI для login/sync/ingest.
 - [x] Реализован API (`/health`, `/status`, `/feed`).
 - [x] Реализовано API управления каналами (`/channels`, patch flags).
+- [x] Реализован batch API для массового обновления каналов (`PATCH /channels`).
 - [x] Реализован Streamlit UI единой ленты + фильтр по каналам.
 - [x] Включена устойчивость ingestion (retry/backoff + FloodWait handling).
+- [x] Добавлено структурированное логирование collector событий.
+- [x] Улучшены permalink для сообщений (public/private fallback).
 - [x] Переключен init flow на Alembic migrations.
-- [x] Добавлены и пройдены тесты (4 passed).
+- [x] Добавлены и пройдены тесты (7 passed).
 - [x] Подготовлен профессиональный docs-pack для GitHub (`README`, `CONTRIBUTING`, `SECURITY`, `CHANGELOG`, API reference, runbook, issue/PR templates).
 
 ## В работе
 
-- [ ] Улучшение permalink для private каналов.
-- [ ] API endpoint для массового обновления каналов.
+- [ ] Нормализация/валидация private permalink по реальным кейсам.
+- [ ] Structured метрики (не только event logs).
 
 ## Не начато
 
-- [ ] Structured logging + метрики.
 - [ ] E2E smoke сценарии с реальным Telegram sandbox аккаунтом.
+- [ ] systemd service units в репозитории (`deploy/`).
 
 ## Прогресс
 
 - Project management/docs: 100%
-- Core implementation: 65%
-- Общий прогресс MVP: 74%
+- Core implementation: 72%
+- Общий прогресс MVP: 79%

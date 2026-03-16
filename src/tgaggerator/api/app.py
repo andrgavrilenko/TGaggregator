@@ -1,9 +1,15 @@
 ﻿from fastapi import Depends, FastAPI, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from tgaggerator.db import get_db
-from tgaggerator.repository import get_feed, get_status, list_channels, set_channel_flags
+from tgaggerator.repository import (
+    get_feed,
+    get_status,
+    list_channels,
+    set_channel_flags,
+    set_channels_flags,
+)
 
 app = FastAPI(title="tgaggerator API", version="0.1.0")
 
@@ -32,6 +38,12 @@ class ChannelItem(BaseModel):
 
 
 class ChannelPatch(BaseModel):
+    enabled: bool | None = None
+    muted: bool | None = None
+
+
+class ChannelBatchPatch(BaseModel):
+    channel_ids: list[int] = Field(min_length=1)
     enabled: bool | None = None
     muted: bool | None = None
 
@@ -71,6 +83,26 @@ def patch_channel(channel_id: int, payload: ChannelPatch, db: Session = Depends(
     if selected is None:
         raise HTTPException(status_code=404, detail="Channel not found after update")
     return ChannelItem(**selected)
+
+
+@app.patch("/channels", response_model=list[ChannelItem])
+def patch_channels(payload: ChannelBatchPatch, db: Session = Depends(get_db)) -> list[ChannelItem]:
+    if payload.enabled is None and payload.muted is None:
+        raise HTTPException(status_code=400, detail="At least one field must be set")
+
+    updated_ids = set_channels_flags(
+        db,
+        channel_ids=payload.channel_ids,
+        enabled=payload.enabled,
+        muted=payload.muted,
+    )
+    if not updated_ids:
+        raise HTTPException(status_code=404, detail="No channels were updated")
+
+    db.commit()
+    items = list_channels(db)
+    selected = [ChannelItem(**item) for item in items if item["id"] in set(updated_ids)]
+    return selected
 
 
 @app.get("/feed", response_model=list[FeedItem])
