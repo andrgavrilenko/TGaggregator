@@ -2,7 +2,12 @@
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        env_ignore_empty=True,
+    )
 
     tg_api_id: int | None = None
     tg_api_hash: str | None = None
@@ -11,6 +16,7 @@ class Settings(BaseSettings):
 
     tg_bot_token: str | None = None
     tg_bot_allowed_chat_id: int | None = None
+    public_channels: str | None = None  # comma-separated @channel handles
 
     db_url: str = "sqlite:///./data/tgaggerator.db"
 

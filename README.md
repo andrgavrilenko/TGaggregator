@@ -54,10 +54,9 @@ tests/            # Unit/API tests
 copy .env.example .env
 ```
 
-Required values:
-- `TG_API_ID`
-- `TG_API_HASH`
-- `TG_PHONE`
+Required values depend on mode:
+- Public-only mode: none required (optionally set `PUBLIC_CHANNELS`)
+- Private+public mode: `TG_API_ID`, `TG_API_HASH`, `TG_PHONE`
 
 For Telegram bot UI:
 - `TG_BOT_TOKEN`
@@ -88,18 +87,29 @@ uv run python -m tgaggerator.cli sync-channels
 uv run python -m tgaggerator.cli bootstrap --limit 200
 ```
 
-### 6) Start services
+### 6) Start services (one command)
 
 ```bash
-uv run python -m tgaggerator.cli ingest-loop --interval 30
-uv run python scripts/run_api.py
-uv run streamlit run src/tgaggerator/ui/app.py
-uv run python scripts/run_telegram_ui.py
+uv run python -m tgaggerator.cli up
 ```
 
 Open:
 - API docs: `http://127.0.0.1:8000/docs`
-- Web UI: `http://127.0.0.1:8501`
+- Web UI: `http://127.0.0.1:8502`
+
+Optional:
+- Start bot too: `uv run python -m tgaggerator.cli up --with-bot`
+- Run in foreground: `uv run python -m tgaggerator.cli up --foreground`
+- Start only API+UI (without collector): `uv run python -m tgaggerator.cli up --no-collector`
+- Stop stack: `uv run python -m tgaggerator.cli down`
+
+### No-Terminal Setup in Web UI
+
+After opening the web UI, use the left sidebar block `Quick Start`:
+- Click `Пуск` to run full startup pipeline (init-db + sync + bootstrap + ingest).
+- Optional: enable `Auto-start on page load`.
+- Public-only mode: add `@channel` via `Add public channel` and run `Пуск` (no account login).
+- If you need private channels later, complete one-time login in the same sidebar (`Send Telegram code` / `Confirm login`).
 
 ## Telegram UI Commands
 
@@ -119,6 +129,7 @@ uv run python -m tgaggerator.cli --help
 Includes:
 - `init-db`, `login`, `sync-channels`, `add-channel`
 - `bootstrap`, `ingest-once`, `ingest-loop`
+- `up`, `down`
 
 ## Environment Variables
 
@@ -130,6 +141,7 @@ Includes:
 | `TG_SESSION_PATH` | No | `.secrets/tg_session` | Session file path |
 | `TG_BOT_TOKEN` | For Telegram UI | - | Telegram bot token |
 | `TG_BOT_ALLOWED_CHAT_ID` | No | - | Restrict bot commands to one chat |
+| `PUBLIC_CHANNELS` | No | - | Comma-separated public channels (`@durov,@telegram`) |
 | `DB_URL` | No | `sqlite:///./data/tgaggerator.db` | Database DSN |
 | `API_HOST` | No | `127.0.0.1` | API bind host |
 | `API_PORT` | No | `8000` | API port |

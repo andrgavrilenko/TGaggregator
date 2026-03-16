@@ -2,6 +2,7 @@
 
 ## P0 Core
 
+- [ ] PRIORITY #1 (tomorrow): окончательно убрать вложенный вид сообщений в Web UI и подтвердить на пользовательском скриншоте.
 - [x] Scaffold проекта и dependency management.
 - [x] DB schema + migrations.
 - [x] Telegram login/session manager.

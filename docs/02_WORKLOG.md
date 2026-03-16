@@ -147,3 +147,85 @@
 - Добавлены тесты:
   - `tests/test_lock.py`
   - проверка muted ingestion policy в `test_repository.py`.
+
+## 2026-03-16 (update 10)
+
+- Переключен активный рабочий контур обратно на `tgaggerator`.
+- Исправлен runtime-блокер API:
+  - причина: пустой `TG_BOT_ALLOWED_CHAT_ID=` в `.env` вызывал `ValidationError` при старте.
+  - решение: `env_ignore_empty=True` в `SettingsConfigDict` (`src/tgaggerator/config.py`).
+- Добавлен regression test:
+  - `tests/test_config.py::test_empty_optional_int_env_is_ignored`.
+- Верификация:
+  - `uv run pytest -q` -> `11 passed`.
+  - `GET /health` -> `200`.
+  - `scripts/smoke_check.py` -> все проверки `OK`.
+
+## 2026-03-16 (update 11)
+
+- Добавлен встроенный orchestration в CLI:
+  - `up` — единый старт collector + API + web UI (+ опционально bot через `--with-bot`).
+  - `down` — единая остановка процессов по PID-state.
+- Реализован PID-state файл стека:
+  - `data/runtime/stack_pids.json`.
+- Обновлен `README` (quick start теперь через `up`/`down`).
+- Добавлены unit-тесты orchestration-хелперов:
+  - `tests/test_cli_stack.py`.
+
+## 2026-03-16 (update 12)
+
+- Реализован no-terminal onboarding внутри продукта:
+  - новые API операции `/ops/*` (init-db, login code flow, sync, bootstrap, ingest-once).
+  - в Streamlit UI добавлен блок `Setup (без терминала)` с кнопками выполнения шагов.
+- Расширен `TelegramGateway` для web-login flow:
+  - `request_login_code()`
+  - `sign_in_with_code()`
+  - `is_authorized()`
+- Добавлены API тесты:
+  - `tests/test_ops_api.py`.
+
+## 2026-03-16 (update 13)
+
+- Добавлен one-click pipeline:
+  - новый endpoint `POST /ops/start` (init-db + auth-check + sync + bootstrap + ingest-once).
+  - в Streamlit UI добавлена основная кнопка `Пуск`.
+  - добавлен toggle `Auto-start on page load`.
+- Сценарий без терминала теперь:
+  - открыть UI
+  - нажать `Пуск`
+  - если неавторизовано — пройти one-time login в том же сайдбаре.
+- Расширены тесты ops API (`tests/test_ops_api.py`) для `/ops/start`.
+
+## 2026-03-16 (update 14)
+
+- Добавлен public-only режим без пользовательской Telegram авторизации:
+  - новый модуль `ingest/public_web.py` (чтение `https://t.me/s/<username>`).
+  - endpoint `POST /ops/public/add` для добавления публичных каналов из UI.
+  - fallback публичного режима в `/ops/start`, `/ops/sync-channels`, `/ops/bootstrap`, `/ops/ingest-once`.
+- UI `Quick Start` обновлён:
+  - поле `Public channel (@username)` + кнопка `Add public channel`.
+  - `Пуск` теперь работает и в public-only режиме.
+- Добавлена env-переменная `PUBLIC_CHANNELS` (comma-separated) в `.env.example` и `config.py`.
+- Верификация: `uv run pytest -q` -> `21 passed`.
+
+## 2026-03-16 (update 15)
+
+- UX cleanup:
+  - лента сообщений в UI переведена в открытый режим по умолчанию (без вложенных карточек на каждое сообщение).
+  - сохранён только технический expander для JSON-результата операций.
+- Ops cleanup:
+  - зафиксировано отсутствие runtime-мусора (нет активных stack pid state, фоновые процессы остановлены перед закрытием сессии).
+- Session memory сохранена:
+  - `docs/09_SESSION_MEMORY_2026-03-16.md`
+- Верификация:
+  - `uv run pytest -q` -> `22 passed`.
+
+## 2026-03-16 (update 16)
+
+- По запросу пользователя зафиксировано:
+  - проблема вложенности сообщений в UI считается НЕ решенной.
+  - задача поставлена как `PRIORITY #1` на следующую сессию.
+- Обновлены документы:
+  - `docs/09_SESSION_MEMORY_2026-03-16.md`
+  - `docs/03_STATUS.md`
+  - `docs/06_SPRINT_BACKLOG.md`

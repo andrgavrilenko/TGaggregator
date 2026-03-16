@@ -15,6 +15,44 @@ Returns service health.
 { "ok": true }
 ```
 
+## Ops endpoints (no-terminal onboarding)
+
+### GET /ops/status
+
+Returns onboarding/runtime status:
+- env flags (`tg_api_configured`, `public_channels_configured`, etc.)
+- `tg_authorized`
+- `public_handles`
+
+### POST /ops/start
+
+One-click startup pipeline.
+
+Request:
+```json
+{ "bootstrap_limit": 200, "run_ingest_once": true }
+```
+
+Behavior:
+- If Telegram account is authorized: uses full Telegram mode.
+- If not authorized: uses public-only mode (configured + manually added public channels).
+
+### POST /ops/public/add
+
+Adds one public Telegram channel by handle.
+
+Request:
+```json
+{ "handle": "@telegram" }
+```
+
+### POST /ops/init-db
+### POST /ops/login/request-code
+### POST /ops/login/confirm
+### POST /ops/sync-channels
+### POST /ops/bootstrap
+### POST /ops/ingest-once
+
 ## GET /status
 
 Aggregate ingestion status.

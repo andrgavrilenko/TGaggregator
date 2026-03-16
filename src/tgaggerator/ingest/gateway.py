@@ -37,6 +37,31 @@ class TelegramGateway:
             password = input("2FA password: ").strip()
             await self.client.sign_in(password=password)
 
+    async def is_authorized(self) -> bool:
+        await self.connect()
+        return await self.client.is_user_authorized()
+
+    async def request_login_code(self, phone: str) -> str:
+        await self.connect()
+        sent = await self.client.send_code_request(phone)
+        return sent.phone_code_hash
+
+    async def sign_in_with_code(
+        self,
+        *,
+        phone: str,
+        code: str,
+        phone_code_hash: str | None = None,
+        password: str | None = None,
+    ) -> None:
+        await self.connect()
+        try:
+            await self.client.sign_in(phone=phone, code=code, phone_code_hash=phone_code_hash)
+        except SessionPasswordNeededError:
+            if not password:
+                raise RuntimeError("2FA_REQUIRED")
+            await self.client.sign_in(password=password)
+
     async def list_channels(self) -> list[ChannelDTO]:
         await self.connect()
         result: list[ChannelDTO] = []
