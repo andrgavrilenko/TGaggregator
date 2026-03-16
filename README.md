@@ -2,47 +2,48 @@
 
 Unified Telegram feed for public and private channels available to your account.
 
-TGaggregator consolidates messages into one chronological stream with filtering, search, and operational visibility.
+TGaggregator consolidates messages into one chronological stream and exposes the feed both in Telegram (primary UI) and web (secondary/admin UI).
 
-## Why This Project
+## Product Direction
 
-Telegram content is fragmented across many channels. This project solves the workflow problem for analysts, traders, and researchers who need one clean timeline instead of manually scanning multiple feeds.
+- Primary UI: Telegram bot commands.
+- Secondary UI: Streamlit web panel.
+- API is intended for localhost/VPN deployment without built-in auth (current stage).
 
-## Current MVP Capabilities
+## Current Capabilities
 
 - Account-level ingestion (private + public channels you can access).
-- Single-writer collector model (stable writes, predictable state).
+- Single-writer collector lock (`COLLECTOR_LOCK_PATH`) to prevent parallel collectors.
 - Incremental sync with state tracking (`last_msg_id`, lag, errors).
-- Retry/backoff and FloodWait handling.
-- Structured collector logs for operations and incident triage.
-- FastAPI backend with feed/status/channels endpoints.
-- Streamlit UI for feed browsing and filtering.
+- Retry/backoff + FloodWait handling.
+- Structured collector logs (JSON events).
+- FastAPI endpoints: feed/status/channels/metrics.
+- Telegram UI bot commands for read/manage/add workflows.
+- Streamlit UI for admin/diagnostic browsing.
 - Alembic migrations for schema lifecycle.
 
-## Architecture (MVP)
+## Important Semantics
 
-1. `Collector` (CLI): pulls new messages via Telegram client API.
-2. `Database`: channels, messages, ingestion state, sync runs.
-3. `API`: exposes feed, status, channel controls.
-4. `UI`: unified timeline and filters.
-
-Key design decision: collector remains the only writer to reduce lock/contention risks.
+- `muted=true` means channel is excluded from ingestion (not only hidden in UI).
+- Write/API security is environment-level (localhost/VPN/reverse proxy), not API-key level yet.
 
 ## Repository Structure
 
 ```text
 src/tgaggerator/
-  api/           # FastAPI app
-  ingest/        # Telegram gateway + DTOs
-  ui/            # Streamlit app
-  cli.py         # Operational commands
-  models.py      # SQLAlchemy models
-  repository.py  # DB queries/commands
-  migrations.py  # Alembic launcher
-migrations/      # Alembic env + revisions
-docs/            # Roadmap, status, runbooks, API docs
-scripts/         # Service launchers
-tests/           # Unit/API tests
+  api/            # FastAPI app
+  ingest/         # Telegram gateway, DTOs, collector lock
+  ui/             # Streamlit app
+  telegram_ui.py  # Telegram bot primary UI
+  cli.py          # Operational commands
+  models.py       # SQLAlchemy models
+  repository.py   # DB queries/commands
+  migrations.py   # Alembic launcher
+migrations/       # Alembic env + revisions
+deploy/systemd/   # systemd service templates
+docs/             # Roadmap, status, runbooks, API docs
+scripts/          # Service launchers + smoke check
+tests/            # Unit/API tests
 ```
 
 ## Quick Start
@@ -53,10 +54,14 @@ tests/           # Unit/API tests
 copy .env.example .env
 ```
 
-Fill required values in `.env`:
+Required values:
 - `TG_API_ID`
 - `TG_API_HASH`
 - `TG_PHONE`
+
+For Telegram bot UI:
+- `TG_BOT_TOKEN`
+- optional `TG_BOT_ALLOWED_CHAT_ID`
 
 ### 2) Install dependencies
 
@@ -76,29 +81,44 @@ uv run python -m tgaggerator.cli init-db
 uv run python -m tgaggerator.cli login
 ```
 
-### 5) Sync channels and bootstrap history
+### 5) Sync and bootstrap
 
 ```bash
 uv run python -m tgaggerator.cli sync-channels
 uv run python -m tgaggerator.cli bootstrap --limit 200
 ```
 
-### 6) Start collector loop
+### 6) Start services
 
 ```bash
 uv run python -m tgaggerator.cli ingest-loop --interval 30
-```
-
-### 7) Start API and UI
-
-```bash
 uv run python scripts/run_api.py
 uv run streamlit run src/tgaggerator/ui/app.py
+uv run python scripts/run_telegram_ui.py
 ```
 
 Open:
 - API docs: `http://127.0.0.1:8000/docs`
-- UI: `http://127.0.0.1:8501`
+- Web UI: `http://127.0.0.1:8501`
+
+## Telegram UI Commands
+
+- `/start`
+- `/latest [N]`
+- `/channels`
+- `/enable <id>` / `/disable <id>`
+- `/mute <id>` / `/unmute <id>`
+- `/add <@channel or https://t.me/...>`
+
+## CLI Commands
+
+```bash
+uv run python -m tgaggerator.cli --help
+```
+
+Includes:
+- `init-db`, `login`, `sync-channels`, `add-channel`
+- `bootstrap`, `ingest-once`, `ingest-loop`
 
 ## Environment Variables
 
@@ -108,21 +128,25 @@ Open:
 | `TG_API_HASH` | Yes | - | Telegram app hash |
 | `TG_PHONE` | For first login | - | Phone for auth |
 | `TG_SESSION_PATH` | No | `.secrets/tg_session` | Session file path |
+| `TG_BOT_TOKEN` | For Telegram UI | - | Telegram bot token |
+| `TG_BOT_ALLOWED_CHAT_ID` | No | - | Restrict bot commands to one chat |
 | `DB_URL` | No | `sqlite:///./data/tgaggerator.db` | Database DSN |
 | `API_HOST` | No | `127.0.0.1` | API bind host |
 | `API_PORT` | No | `8000` | API port |
-| `UI_API_BASE` | No | `http://127.0.0.1:8000` | UI backend URL |
+| `UI_API_BASE` | No | `http://127.0.0.1:8000` | API base for web/bot clients |
 | `DEFAULT_BOOTSTRAP_LIMIT` | No | `200` | Initial history depth per channel |
 | `INGEST_INTERVAL_SEC` | No | `30` | Collector loop interval |
 | `INGEST_MAX_RETRIES` | No | `3` | Retry attempts |
 | `INGEST_RETRY_BASE_SEC` | No | `2` | Exponential backoff base |
 | `INGEST_RETRY_MAX_SEC` | No | `30` | Backoff cap |
+| `COLLECTOR_LOCK_PATH` | No | `.secrets/collector.lock` | Single-writer lock file |
 | `LOG_LEVEL` | No | `INFO` | Collector/API log verbosity |
 
 ## API Overview
 
 - `GET /health`
 - `GET /status`
+- `GET /metrics`
 - `GET /channels`
 - `PATCH /channels/{channel_id}`
 - `PATCH /channels` (batch update)
@@ -134,21 +158,22 @@ Detailed reference: [docs/08_API_REFERENCE.md](docs/08_API_REFERENCE.md)
 
 ```bash
 uv run pytest -q
+uv run python scripts/smoke_check.py
 ```
 
 ## Security Notes
 
 - Never commit `.env` or `.session` files.
 - Treat Telegram session as account secret.
-- Restrict UI/API exposure on public hosts.
+- Keep API/UI local or behind VPN/reverse proxy auth.
 
 See: [SECURITY.md](SECURITY.md)
 
 ## Documentation
 
-- Project roadmap: [docs/01_ROADMAP.md](docs/01_ROADMAP.md)
+- Roadmap: [docs/01_ROADMAP.md](docs/01_ROADMAP.md)
 - Worklog: [docs/02_WORKLOG.md](docs/02_WORKLOG.md)
-- Live status: [docs/03_STATUS.md](docs/03_STATUS.md)
+- Status: [docs/03_STATUS.md](docs/03_STATUS.md)
 - Architecture: [docs/05_ARCHITECTURE_MVP.md](docs/05_ARCHITECTURE_MVP.md)
 - Deploy runbook: [docs/07_DEPLOY_RUNBOOK.md](docs/07_DEPLOY_RUNBOOK.md)
 

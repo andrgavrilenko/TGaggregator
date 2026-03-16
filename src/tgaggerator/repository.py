@@ -229,3 +229,27 @@ def get_status(db: Session) -> dict:
             for row in states
         ],
     }
+
+
+def get_metrics(db: Session) -> dict[str, int]:
+    total_channels = db.scalar(select(func.count(Channel.id))) or 0
+    enabled_channels = db.scalar(select(func.count(Channel.id)).where(Channel.enabled.is_(True))) or 0
+    muted_channels = db.scalar(select(func.count(Channel.id)).where(Channel.muted.is_(True))) or 0
+    total_messages = db.scalar(select(func.count(Message.id))) or 0
+
+    states_with_error = (
+        db.scalar(
+            select(func.count(IngestionState.channel_id)).where(IngestionState.last_error.is_not(None))
+        )
+        or 0
+    )
+    error_events = db.scalar(select(func.coalesce(func.sum(IngestionState.error_count), 0))) or 0
+
+    return {
+        "channels_total": int(total_channels),
+        "channels_enabled": int(enabled_channels),
+        "channels_muted": int(muted_channels),
+        "messages_total": int(total_messages),
+        "channels_with_error": int(states_with_error),
+        "ingest_error_events_total": int(error_events),
+    }

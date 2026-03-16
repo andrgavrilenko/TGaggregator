@@ -1,4 +1,5 @@
-﻿from importlib import reload
+﻿from datetime import UTC, datetime
+from importlib import reload
 
 from fastapi.testclient import TestClient
 
@@ -73,3 +74,45 @@ def test_channels_batch_patch(tmp_path, monkeypatch):
     payload = resp.json()
     assert len(payload) == 2
     assert all(item["muted"] is True for item in payload)
+
+
+def test_metrics_endpoint(tmp_path, monkeypatch):
+    db_path = tmp_path / "test_metrics.db"
+    monkeypatch.setenv("DB_URL", f"sqlite:///{db_path}")
+
+    import tgaggerator.config as cfg
+    import tgaggerator.db as db_mod
+    import tgaggerator.init_db as init_mod
+    import tgaggerator.repository as repo_mod
+    import tgaggerator.api.app as api_mod
+
+    reload(cfg)
+    reload(db_mod)
+    reload(init_mod)
+    reload(repo_mod)
+    reload(api_mod)
+
+    init_mod.init_db_for_tests()
+    with db_mod.SessionLocal() as db:
+        c1 = repo_mod.upsert_channel(db, tg_id=2001, title="M1", username="m1", is_private=False)
+        repo_mod.insert_message_if_new(
+            db,
+            channel_id=c1.id,
+            tg_message_id=1,
+            date_utc=datetime.now(UTC),
+            text="hello",
+            media_type=None,
+            views=None,
+            forwards=None,
+            link="https://t.me/m1/1",
+            raw_json=None,
+        )
+        repo_mod.mark_error(db, channel_id=c1.id, message="sample error")
+        db.commit()
+
+    local_client = TestClient(api_mod.app)
+    resp = local_client.get("/metrics")
+    assert resp.status_code == 200
+    assert "tgaggerator_channels_total" in resp.text
+    assert "tgaggerator_messages_total" in resp.text
+    assert "tgaggerator_ingest_error_events_total" in resp.text

@@ -112,3 +112,38 @@
   - проверка link builder.
 - Обновлены `README.md` и `docs/08_API_REFERENCE.md`.
 - Верификация: `uv run pytest -q` -> `7 passed`.
+
+## 2026-03-16 (update 8)
+
+- Обновлен продуктовый вектор в roadmap: Telegram назначен primary UI channel.
+- В `docs/01_ROADMAP.md` добавлена фаза `Telegram-First UX` с конкретными Telegram-сценариями:
+  - чтение ленты,
+  - управление каналами,
+  - добавление каналов.
+- В `docs/05_ARCHITECTURE_MVP.md` закреплена архитектурная модель:
+  - Telegram UI = primary,
+  - Streamlit UI = secondary/admin.
+- В `docs/06_SPRINT_BACKLOG.md` добавлен отдельный блок `P0.1 Telegram-First Transition`.
+
+## 2026-03-16 (update 9)
+
+- Применены пользовательские решения по quiz:
+  - security: localhost/VPN model,
+  - muted = stop ingestion,
+  - single-writer lock enabled,
+  - entity preload + refresh on miss,
+  - sync_runs deferred,
+  - broad catch strategy retained,
+  - docs backlog/status synchronized,
+  - release mode: minimal Telegram UI + web.
+- Реализован `collector` lock (`COLLECTOR_LOCK_PATH`).
+- CLI ingestion переведен на process-level entity cache + refresh on missing entity.
+- Добавлена команда `add-channel` в CLI.
+- Добавлен Telegram UI модуль и runner:
+  - `src/tgaggerator/telegram_ui.py`
+  - `scripts/run_telegram_ui.py`
+- Добавлены deploy units для telegram-ui.
+- Обновлены `README`, `roadmap`, `architecture`, `sprint backlog`, `runbook`, `api reference`.
+- Добавлены тесты:
+  - `tests/test_lock.py`
+  - проверка muted ingestion policy в `test_repository.py`.

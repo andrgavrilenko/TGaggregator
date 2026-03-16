@@ -16,6 +16,7 @@ dependencies = [
   "streamlit>=1.40",
   "requests>=2.32",
   "python-dotenv>=1.0",
+  "python-telegram-bot>=22.0",
 ]
 
 [dependency-groups]

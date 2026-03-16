@@ -1,58 +1,70 @@
 ﻿# 01 Roadmap
 
 Дата старта: 2026-03-16
-Релизная цель: MVP v0.1 (единая хронологическая лента Telegram)
+Текущий релизный вектор: Telegram-first (minimal Telegram UI + web admin UI).
 
-## Фаза 0. Инициация (день 0)
+## Product Decisions (accepted)
 
-- Создан контур документации и управление работами.
-- Зафиксированы агентные потоки и границы ответственности.
-- Определены критерии MVP.
+1. Security: localhost/VPN deployment model for now (no embedded API auth yet).
+2. `muted=true` excludes channel from ingestion.
+3. Single-writer enforcement is mandatory.
+4. Entity map is loaded once per collector process and refreshed on demand.
+5. `sync_runs` stays in schema, full usage deferred.
+6. Broad exception strategy remains for current speed.
+7. Backlog/Status must stay synchronized.
+8. Release mode: minimal Telegram UI + web UI in parallel.
 
-Выход:
-- Документация готова.
+## Phase 1 Core Foundation
 
-## Фаза 1. Core Foundation (дни 1-2)
+- Python project structure.
+- Environment config.
+- DB schema and migrations.
+- Data/API contracts.
 
-- Базовая структура Python-проекта.
-- Конфигурация окружений (`.env`, settings).
-- БД схема и миграции (`channels`, `messages`, `ingestion_state`, `sync_runs`).
-- Интеграционные контракты (DTO/схемы API).
+Status: done.
 
-Выход:
-- Проект запускается локально, миграции применяются.
+## Phase 2 Ingestion Stability
 
-## Фаза 2. Ingestion (дни 2-4)
+- MTProto authorization.
+- Bootstrap + incremental sync.
+- Retry/backoff/FloodWait.
+- Single-writer lock.
+- Entity map refresh strategy.
 
-- Авторизация MTProto.
-- Импорт каналов и bootstrap истории.
-- Инкрементальный синк с retry/backoff.
-- Обработка rate-limit/FloodWait.
+Status: done.
 
-Выход:
-- Сообщения стабильно попадают в БД без дублей.
+## Phase 3 API + Web Admin UI
 
-## Фаза 3. API + UI (дни 4-6)
+- Feed/status/channels API.
+- Batch channels update.
+- Metrics endpoint.
+- Streamlit admin UI.
 
-- API endpoints: feed/status/channel toggles.
-- UI лента: фильтры, поиск, пагинация.
-- Базовые сценарии ручного тестирования.
+Status: done.
 
-Выход:
-- Рабочая единая лента для пользователя.
+## Phase 4 Telegram-First UX (minimal)
 
-## Фаза 4. Ops + Hardening (дни 6-8)
+- Telegram bot as primary UX channel.
+- Read commands (`/latest`).
+- Channel management commands.
+- Channel add command.
 
-- System service/автозапуск.
-- Логи, health/status, backup/restore.
-- Security baseline.
+Status: in progress (minimal layer implemented).
 
-Выход:
-- MVP готов к стабильному запуску на VPS.
+## Phase 5 Hardening
 
-## Критерии приемки MVP
+- Inline controls in Telegram.
+- UX audit without web UI dependency.
+- E2E smoke with sandbox account.
+- Deploy automation and operational playbooks.
 
-1. Private/public каналы читаются под аккаунтом пользователя.
-2. Лента строго по времени, без дублей.
-3. После перезапуска синк продолжается автоматически.
-4. Статус синка и ошибки прозрачно видны.
+Status: planned.
+
+## Acceptance Criteria (next milestone)
+
+1. User can read feed in Telegram.
+2. User can manage channels in Telegram.
+3. User can add channel from Telegram command.
+4. Collector remains single-writer.
+5. System remains stable after restart.
+6. Web UI continues as secondary/admin fallback.

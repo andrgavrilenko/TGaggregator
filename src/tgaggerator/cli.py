@@ -1,7 +1,6 @@
 ﻿import asyncio
 import json
 import logging
-import time
 from datetime import UTC, datetime
 
 import typer
@@ -9,6 +8,7 @@ from telethon.errors import FloodWaitError
 
 from tgaggerator.config import settings
 from tgaggerator.db import SessionLocal
+from tgaggerator.ingest.collector_lock import CollectorAlreadyRunningError, collector_lock
 from tgaggerator.ingest.dto import MessageDTO
 from tgaggerator.ingest.gateway import TelegramGateway, run
 from tgaggerator.init_db import init_db
@@ -74,6 +74,26 @@ def sync_channels_cmd() -> None:
         db.commit()
 
     typer.echo(f"Synced channels: {len(channels)}")
+
+
+@app.command("add-channel")
+def add_channel_cmd(handle: str = typer.Argument(..., help="@channel or https://t.me/channel")) -> None:
+    gateway = TelegramGateway()
+    channel = run(gateway.resolve_channel(handle))
+    run(gateway.disconnect())
+
+    with SessionLocal() as db:
+        upsert_channel(
+            db,
+            tg_id=channel.tg_id,
+            title=channel.title,
+            username=channel.username,
+            is_private=channel.is_private,
+            enabled=True,
+        )
+        db.commit()
+
+    typer.echo(f"Added channel: {channel.title} ({channel.tg_id})")
 
 
 async def _ingest_channel_with_retry(
@@ -178,90 +198,150 @@ async def _ingest_channel_with_retry(
     return 0
 
 
-async def _ingest_once(limit_per_channel: int | None) -> tuple[int, int]:
-    gateway = TelegramGateway()
-    await gateway.connect()
+async def _refresh_entities(gateway: TelegramGateway) -> dict[int, object]:
+    return await gateway.map_dialog_entities()
 
-    try:
-        entities = await gateway.map_dialog_entities()
-        inserted = 0
-        processed_channels = 0
 
-        with SessionLocal() as db:
-            channels = get_enabled_channels(db)
+async def _ingest_once_core(
+    gateway: TelegramGateway,
+    entities: dict[int, object],
+    limit_per_channel: int | None,
+) -> tuple[int, int, dict[int, object]]:
+    inserted = 0
+    processed_channels = 0
 
-        for channel in channels:
-            entity = entities.get(channel.tg_id)
-            if entity is None:
-                with SessionLocal() as db:
-                    mark_error(db, channel_id=channel.id, message="Entity not found in dialogs")
-                    db.commit()
-                log_event("channel_entity_missing", channel_id=channel.id, channel_title=channel.title)
-                continue
+    with SessionLocal() as db:
+        channels = get_enabled_channels(db)
 
+    for channel in channels:
+        entity = entities.get(channel.tg_id)
+        if entity is None:
             try:
-                local_inserted = await _ingest_channel_with_retry(
-                    gateway,
-                    entity=entity,
-                    channel=channel,
-                    limit_per_channel=limit_per_channel,
-                )
-                inserted += local_inserted
-                processed_channels += 1
+                entities = await _refresh_entities(gateway)
+                entity = entities.get(channel.tg_id)
             except Exception as exc:
                 with SessionLocal() as db:
-                    mark_error(db, channel_id=channel.id, message=f"Final failure: {exc}")
+                    mark_error(db, channel_id=channel.id, message=f"Entity refresh failed: {exc}")
                     db.commit()
                 log_event(
-                    "channel_ingest_failed",
+                    "channel_entity_refresh_failed",
                     channel_id=channel.id,
                     channel_title=channel.title,
                     error=str(exc),
                 )
 
+        if entity is None:
+            with SessionLocal() as db:
+                mark_error(db, channel_id=channel.id, message="Entity not found in dialogs")
+                db.commit()
+            log_event("channel_entity_missing", channel_id=channel.id, channel_title=channel.title)
+            continue
+
+        try:
+            local_inserted = await _ingest_channel_with_retry(
+                gateway,
+                entity=entity,
+                channel=channel,
+                limit_per_channel=limit_per_channel,
+            )
+            inserted += local_inserted
+            processed_channels += 1
+        except Exception as exc:
+            with SessionLocal() as db:
+                mark_error(db, channel_id=channel.id, message=f"Final failure: {exc}")
+                db.commit()
+            log_event(
+                "channel_ingest_failed",
+                channel_id=channel.id,
+                channel_title=channel.title,
+                error=str(exc),
+            )
+
+    return inserted, processed_channels, entities
+
+
+async def _ingest_once(limit_per_channel: int | None) -> tuple[int, int]:
+    gateway = TelegramGateway()
+    await gateway.connect()
+
+    try:
+        entities = await _refresh_entities(gateway)
+        inserted, processed_channels, _ = await _ingest_once_core(gateway, entities, limit_per_channel)
         return inserted, processed_channels
     finally:
         await gateway.disconnect()
+
+
+async def _ingest_loop(every: int) -> None:
+    gateway = TelegramGateway()
+    await gateway.connect()
+    entities = await _refresh_entities(gateway)
+
+    try:
+        while True:
+            tick_started = datetime.now(UTC)
+            try:
+                inserted, channels, entities = await _ingest_once_core(gateway, entities, None)
+                duration_ms = int((datetime.now(UTC) - tick_started).total_seconds() * 1000)
+                log_event(
+                    "ingest_tick_ok",
+                    channels=channels,
+                    inserted=inserted,
+                    duration_ms=duration_ms,
+                )
+                typer.echo(f"Ingest tick: channels={channels}, inserted={inserted}")
+            except Exception as exc:
+                duration_ms = int((datetime.now(UTC) - tick_started).total_seconds() * 1000)
+                log_event(
+                    "ingest_tick_failed",
+                    duration_ms=duration_ms,
+                    error=str(exc),
+                )
+                typer.echo(f"Ingest tick failed: {exc}")
+
+            await asyncio.sleep(every)
+    finally:
+        await gateway.disconnect()
+
+
+def _with_collector_lock(fn):
+    try:
+        with collector_lock(settings.collector_lock_path):
+            return fn()
+    except CollectorAlreadyRunningError:
+        typer.echo("Collector is already running (lock is held).")
+        raise typer.Exit(code=2)
 
 
 @app.command("bootstrap")
 def bootstrap_cmd(limit: int = typer.Option(None, help="Messages per channel")) -> None:
     if limit is None:
         limit = settings.default_bootstrap_limit
-    inserted, channels = run(_ingest_once(limit))
-    typer.echo(f"Bootstrap complete. channels={channels}, inserted={inserted}")
+
+    def _run_once():
+        inserted, channels = run(_ingest_once(limit))
+        typer.echo(f"Bootstrap complete. channels={channels}, inserted={inserted}")
+
+    _with_collector_lock(_run_once)
 
 
 @app.command("ingest-once")
 def ingest_once_cmd(limit: int = typer.Option(None, help="Messages per channel, optional")) -> None:
-    inserted, channels = run(_ingest_once(limit))
-    typer.echo(f"Ingest complete. channels={channels}, inserted={inserted}")
+    def _run_once():
+        inserted, channels = run(_ingest_once(limit))
+        typer.echo(f"Ingest complete. channels={channels}, inserted={inserted}")
+
+    _with_collector_lock(_run_once)
 
 
 @app.command("ingest-loop")
 def ingest_loop_cmd(interval: int = typer.Option(None, help="Loop interval seconds")) -> None:
     every = interval or settings.ingest_interval_sec
-    while True:
-        tick_started = datetime.now(UTC)
-        try:
-            inserted, channels = run(_ingest_once(None))
-            duration_ms = int((datetime.now(UTC) - tick_started).total_seconds() * 1000)
-            log_event(
-                "ingest_tick_ok",
-                channels=channels,
-                inserted=inserted,
-                duration_ms=duration_ms,
-            )
-            typer.echo(f"Ingest tick: channels={channels}, inserted={inserted}")
-        except Exception as exc:
-            duration_ms = int((datetime.now(UTC) - tick_started).total_seconds() * 1000)
-            log_event(
-                "ingest_tick_failed",
-                duration_ms=duration_ms,
-                error=str(exc),
-            )
-            typer.echo(f"Ingest tick failed: {exc}")
-        time.sleep(every)
+
+    def _run_loop():
+        run(_ingest_loop(every))
+
+    _with_collector_lock(_run_loop)
 
 
 if __name__ == "__main__":

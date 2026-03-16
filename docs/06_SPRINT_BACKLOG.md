@@ -1,34 +1,49 @@
 ﻿# 06 Sprint Backlog
 
-## P0 (обязательно)
+## P0 Core
 
-- [ ] Scaffold проекта и dependency management.
-- [ ] DB schema + migrations.
-- [ ] Telegram login/session manager.
-- [ ] Channels bootstrap + toggle state.
-- [ ] Incremental ingestion + dedup.
-- [ ] Feed API.
-- [ ] Streamlit feed UI.
-- [ ] Status endpoint/panel.
-- [ ] Service autostart.
+- [x] Scaffold проекта и dependency management.
+- [x] DB schema + migrations.
+- [x] Telegram login/session manager.
+- [x] Channels bootstrap + toggle state.
+- [x] Incremental ingestion + dedup.
+- [x] Feed API.
+- [x] Streamlit feed UI (secondary/admin).
+- [x] Status endpoint/panel.
+- [x] Service autostart templates (`deploy/systemd`).
+- [x] Single-writer collector lock.
+- [x] Metrics endpoint (`/metrics`).
 
-## P1 (после MVP)
+## P0.1 Telegram-First Transition
+
+- [x] Telegram bot/chat интерфейс как основной UI (minimal).
+- [x] Команды чтения ленты (`/latest`).
+- [x] Команды управления каналами (`/channels`, `/enable`, `/disable`, `/mute`, `/unmute`).
+- [x] Команда добавления каналов (`/add @channel` / `t.me/...`).
+- [ ] Inline buttons для быстрых действий из Telegram.
+- [ ] UX audit: все основные сценарии проходят без web UI.
+
+## P1 Next
 
 - [ ] Read/unread state.
 - [ ] Дедуп похожих кросспостов.
 - [ ] Digest/alerts.
 - [ ] Расширенная аналитика по каналам.
+- [ ] Персональные Telegram presets/watchlists.
+- [ ] API auth layer (если выход за localhost/VPN модель).
 
-## Зависимости между задачами
+## Dependencies
 
 1. DB schema -> ingestion/API.
 2. Ingestion -> feed API.
-3. Feed API -> UI.
-4. QA/ops после стабилизации P0.
+3. Feed API -> Telegram UI + Web UI.
+4. Telegram-first UX -> alerts/personalization.
+5. QA/ops after P0/P0.1 stabilization.
 
-## Definition of Done (спринт)
+## Definition of Done (current increment)
 
-- Все P0 закрыты.
+- Все P0 задачи закрыты.
+- Telegram UI покрывает базовые сценарии read/manage/add.
 - Есть runbook запуска.
-- Есть статусная панель и журнал ошибок.
-- Базовые smoke-тесты проходят.
+- Есть status/metrics/logging.
+- Smoke + unit tests проходят.

@@ -120,3 +120,30 @@ def test_message_link_builder():
 
     assert public_link == "https://t.me/mychan/17"
     assert private_link == "https://t.me/c/1234567890/42"
+
+
+def test_muted_channel_not_ingested(tmp_path, monkeypatch):
+    db_path = tmp_path / "test_muted.db"
+    monkeypatch.setenv("DB_URL", f"sqlite:///{db_path}")
+
+    import tgaggerator.config as cfg
+    import tgaggerator.db as db_mod
+    import tgaggerator.init_db as init_mod
+    import tgaggerator.repository as repo_mod
+
+    reload(cfg)
+    reload(db_mod)
+    reload(init_mod)
+    reload(repo_mod)
+
+    init_mod.init_db_for_tests()
+
+    with db_mod.SessionLocal() as db:
+        c1 = repo_mod.upsert_channel(db, tg_id=100, title="live", username=None, is_private=True)
+        c2 = repo_mod.upsert_channel(db, tg_id=200, title="muted", username=None, is_private=True)
+        c2.muted = True
+        db.commit()
+
+        enabled = repo_mod.get_enabled_channels(db)
+
+    assert [c.id for c in enabled] == [c1.id]

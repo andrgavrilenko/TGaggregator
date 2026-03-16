@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     tg_phone: str | None = None
     tg_session_path: str = ".secrets/tg_session"
 
+    tg_bot_token: str | None = None
+    tg_bot_allowed_chat_id: int | None = None
+
     db_url: str = "sqlite:///./data/tgaggerator.db"
 
     api_host: str = "127.0.0.1"
@@ -22,6 +25,8 @@ class Settings(BaseSettings):
     ingest_max_retries: int = 3
     ingest_retry_base_sec: int = 2
     ingest_retry_max_sec: int = 30
+
+    collector_lock_path: str = ".secrets/collector.lock"
 
     log_level: str = "INFO"
 

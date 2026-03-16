@@ -2,11 +2,14 @@
 
 Base URL: `http://127.0.0.1:8000`
 
+## Security model (current)
+
+- API is expected to run on localhost/VPN.
+- Built-in API auth is not enabled yet.
+
 ## GET /health
 
 Returns service health.
-
-Response:
 
 ```json
 { "ok": true }
@@ -14,17 +17,29 @@ Response:
 
 ## GET /status
 
-Returns aggregate ingestion status.
+Aggregate ingestion status.
 
-Response fields:
+Fields:
 - `total_channels`
 - `enabled_channels`
 - `total_messages`
-- `states[]` with per-channel sync metadata
+- `states[]` (per-channel sync metadata)
+
+## GET /metrics
+
+Prometheus-style metrics endpoint (`text/plain; version=0.0.4`).
+
+Includes:
+- `tgaggerator_channels_total`
+- `tgaggerator_channels_enabled`
+- `tgaggerator_channels_muted`
+- `tgaggerator_messages_total`
+- `tgaggerator_channels_with_error`
+- `tgaggerator_ingest_error_events_total`
 
 ## GET /channels
 
-Returns all channels known to the system.
+Returns channel catalog.
 
 Fields:
 - `id`, `tg_id`, `title`, `username`
@@ -33,44 +48,37 @@ Fields:
 
 ## PATCH /channels/{channel_id}
 
-Updates one channel flags.
-
-Request body:
+Updates one channel.
 
 ```json
-{
-  "enabled": true,
-  "muted": false
-}
+{ "enabled": true, "muted": false }
 ```
 
 Rules:
-- At least one of `enabled` or `muted` must be provided.
+- At least one of `enabled` or `muted` is required.
 
 ## PATCH /channels
 
-Batch updates multiple channels.
-
-Request body:
+Batch update for multiple channels.
 
 ```json
 {
-  "channel_ids": [1, 2, 3],
+  "channel_ids": [1,2,3],
   "enabled": true,
   "muted": false
 }
 ```
 
 Rules:
-- `channel_ids` must not be empty.
-- At least one of `enabled` or `muted` must be provided.
+- `channel_ids` must be non-empty.
+- At least one of `enabled` or `muted` is required.
 
 ## GET /feed
 
-Returns chronological feed entries.
+Chronological feed.
 
 Query params:
-- `q` (string, optional)
+- `q` (optional text filter)
 - `channel_ids` (repeatable int param)
 - `only_media` (bool)
 - `limit` (1..500)
@@ -79,5 +87,9 @@ Query params:
 Example:
 
 ```bash
-curl "http://127.0.0.1:8000/feed?only_media=false&limit=50"
+curl "http://127.0.0.1:8000/feed?limit=50&only_media=false"
 ```
+
+## Semantics note
+
+- `muted=true` means the channel is excluded from ingestion in current policy.

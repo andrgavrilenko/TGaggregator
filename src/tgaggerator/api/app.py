@@ -1,10 +1,13 @@
-﻿from fastapi import Depends, FastAPI, HTTPException, Query
+﻿from datetime import UTC, datetime
+
+from fastapi import Depends, FastAPI, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from tgaggerator.db import get_db
 from tgaggerator.repository import (
     get_feed,
+    get_metrics,
     get_status,
     list_channels,
     set_channel_flags,
@@ -56,6 +59,38 @@ def health() -> dict:
 @app.get("/status")
 def status(db: Session = Depends(get_db)) -> dict:
     return get_status(db)
+
+
+@app.get("/metrics")
+def metrics(db: Session = Depends(get_db)) -> Response:
+    m = get_metrics(db)
+    lines = [
+        "# HELP tgaggerator_channels_total Total channels in catalog",
+        "# TYPE tgaggerator_channels_total gauge",
+        f"tgaggerator_channels_total {m['channels_total']}",
+        "# HELP tgaggerator_channels_enabled Enabled channels",
+        "# TYPE tgaggerator_channels_enabled gauge",
+        f"tgaggerator_channels_enabled {m['channels_enabled']}",
+        "# HELP tgaggerator_channels_muted Muted channels",
+        "# TYPE tgaggerator_channels_muted gauge",
+        f"tgaggerator_channels_muted {m['channels_muted']}",
+        "# HELP tgaggerator_messages_total Total ingested messages",
+        "# TYPE tgaggerator_messages_total gauge",
+        f"tgaggerator_messages_total {m['messages_total']}",
+        "# HELP tgaggerator_channels_with_error Channels with non-empty last_error",
+        "# TYPE tgaggerator_channels_with_error gauge",
+        f"tgaggerator_channels_with_error {m['channels_with_error']}",
+        "# HELP tgaggerator_ingest_error_events_total Total recorded ingestion errors",
+        "# TYPE tgaggerator_ingest_error_events_total counter",
+        f"tgaggerator_ingest_error_events_total {m['ingest_error_events_total']}",
+        "# HELP tgaggerator_metrics_generated_unixtime Metrics generation timestamp",
+        "# TYPE tgaggerator_metrics_generated_unixtime gauge",
+        f"tgaggerator_metrics_generated_unixtime {int(datetime.now(UTC).timestamp())}",
+    ]
+    return Response(
+        content="\n".join(lines) + "\n",
+        media_type="text/plain; version=0.0.4; charset=utf-8",
+    )
 
 
 @app.get("/channels", response_model=list[ChannelItem])

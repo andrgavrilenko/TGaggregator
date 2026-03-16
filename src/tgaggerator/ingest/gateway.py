@@ -3,6 +3,7 @@
 from telethon import TelegramClient
 from telethon.errors import SessionPasswordNeededError
 from telethon.tl.types import Channel as TLChannel
+from telethon.utils import get_peer_id
 
 from tgaggerator.config import settings
 from tgaggerator.ingest.dto import ChannelDTO
@@ -54,6 +55,24 @@ class TelegramGateway:
                 )
             )
         return result
+
+    async def resolve_channel(self, handle: str) -> ChannelDTO:
+        await self.connect()
+        normalized = handle.strip()
+        if normalized.startswith("https://t.me/"):
+            normalized = normalized.removeprefix("https://t.me/")
+        normalized = normalized.lstrip("@").split("/")[0]
+
+        entity = await self.client.get_entity(normalized)
+        if not isinstance(entity, TLChannel):
+            raise RuntimeError("Entity is not a channel")
+
+        return ChannelDTO(
+            tg_id=get_peer_id(entity),
+            title=getattr(entity, "title", normalized),
+            username=getattr(entity, "username", None),
+            is_private=getattr(entity, "username", None) is None,
+        )
 
     async def iter_messages(self, *, entity, min_id: int, limit: int | None = None):
         await self.connect()
