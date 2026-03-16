@@ -1,0 +1,22 @@
+﻿# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Virtualenv
+.venv/
+
+# Secrets
+.env
+*.session
+*.session-journal
+.secrets/
+
+# Runtime data
+*.db
+*.sqlite
+data/
+
+# IDE
+.vscode/
+.idea/
